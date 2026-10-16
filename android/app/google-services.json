@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "400023194089",
+    "project_id": "kasu-connect",
+    "storage_bucket": "kasu-connect.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:400023194089:android:0c110a1168132a91d3e378",
+        "android_client_info": {
+          "package_name": "ng.kasuconnect.kasuconnect"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAEhcAzKCykrIRKE348XW3KnQKLoFjNmkI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
