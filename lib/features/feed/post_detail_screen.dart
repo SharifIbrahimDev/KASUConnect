@@ -113,7 +113,7 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
                     child: TextField(
                       controller: _commentController,
                       maxLength: AppConstants.maxCommentLength,
-                      buildCounter: (_, {required currentLength, isFocused, maxLength}) => null,
+                      buildCounter: (_, {required currentLength, required isFocused, maxLength}) => null,
                       decoration: const InputDecoration(
                         hintText: 'Add a helpful comment or question...',
                         contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),

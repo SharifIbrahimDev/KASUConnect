@@ -17,10 +17,7 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      throw UnsupportedError(
-        'DefaultFirebaseOptions have not been configured for web - '
-        'you can reconfigure this by running the FlutterFire CLI again.',
-      );
+      return web;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -56,7 +53,6 @@ class DefaultFirebaseOptions {
     projectId: 'kasu-connect',
     storageBucket: 'kasu-connect.firebasestorage.app',
   );
-
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyBit8RZWBOVsHEsgMF6UcEF_4bwGK48Kt4',
     appId: '1:400023194089:ios:abb6c2dd2d051ef4d3e378',
@@ -64,5 +60,14 @@ class DefaultFirebaseOptions {
     projectId: 'kasu-connect',
     storageBucket: 'kasu-connect.firebasestorage.app',
     iosBundleId: 'ng.kasuconnect.kasuconnect',
+  );
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyAWk3QP-uZMNXZSP-BjlAdIiNsrrAKknbY',
+    appId: '1:400023194089:web:3d4b5f5c56b1d0d7d3e378',
+    messagingSenderId: '400023194089',
+    projectId: 'kasu-connect',
+    authDomain: 'kasu-connect.firebaseapp.com',
+    storageBucket: 'kasu-connect.firebasestorage.app',
+    measurementId: 'G-XFM9LJF8MC',
   );
 }

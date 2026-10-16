@@ -1,5 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -16,7 +17,9 @@ Future<void> main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
     await Env.connectEmulatorsIfEnabled();
-    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+    if (!kIsWeb) {
+      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+    }
   } catch (e) {
     debugPrint('Firebase initialization notice: $e');
   }
