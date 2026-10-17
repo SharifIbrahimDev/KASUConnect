@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/user_model.dart';
@@ -19,15 +20,21 @@ class AdminRepository {
 
   final List<ReportModel> _reports = List.from(MockDataSeed.reports);
   final ValueNotifier<List<ReportModel>> _reportsNotifier = ValueNotifier([]);
+  final StreamController<List<ReportModel>> _streamController = StreamController<List<ReportModel>>.broadcast();
 
   AdminRepository(this._authRepo, this._jobRepo) {
     _reportsNotifier.value = List.unmodifiable(_reports);
   }
 
-  Stream<List<ReportModel>> get reportsStream => Stream.periodic(
-        const Duration(milliseconds: 500),
-        (_) => List<ReportModel>.unmodifiable(_reports),
-      ).distinct();
+  Stream<List<ReportModel>> get reportsStream => _streamController.stream;
+
+  void _notify() {
+    final list = List<ReportModel>.unmodifiable(_reports);
+    _reportsNotifier.value = list;
+    if (!_streamController.isClosed) {
+      _streamController.add(list);
+    }
+  }
 
   List<ReportModel> get reports => List.unmodifiable(_reports);
 
@@ -90,14 +97,14 @@ class AdminRepository {
       createdAt: DateTime.now(),
     );
     _reports.insert(0, rep);
-    _reportsNotifier.value = List.unmodifiable(_reports);
+    _notify();
   }
 
   void resolveReport(String reportId, String status) {
     final idx = _reports.indexWhere((r) => r.id == reportId);
     if (idx != -1) {
       _reports[idx] = _reports[idx].copyWith(status: status);
-      _reportsNotifier.value = List.unmodifiable(_reports);
+      _notify();
     }
   }
 

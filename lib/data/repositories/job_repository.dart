@@ -1,12 +1,15 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/job_model.dart';
 import '../models/job_application_model.dart';
 import '../models/user_model.dart';
+import '../services/firestore_service.dart';
 import '../services/mock_data_seed.dart';
 
 final jobRepositoryProvider = Provider<JobRepository>((ref) {
-  return JobRepository();
+  final firestore = ref.watch(firestoreServiceProvider);
+  return JobRepository(firestoreService: firestore);
 });
 
 final jobsListProvider = StateNotifierProvider<JobsListNotifier, List<JobModel>>((ref) {
@@ -21,11 +24,18 @@ final userApplicationsProvider = Provider<List<JobApplicationModel>>((ref) {
 
 class JobsListNotifier extends StateNotifier<List<JobModel>> {
   final JobRepository _repo;
+  StreamSubscription? _sub;
 
   JobsListNotifier(this._repo) : super(_repo.getApprovedJobs()) {
-    _repo.jobsStream.listen((_) {
+    _sub = _repo.jobsStream.listen((_) {
       state = _repo.getApprovedJobs();
     });
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
   }
 
   void postJob({
@@ -63,18 +73,55 @@ class JobsListNotifier extends StateNotifier<List<JobModel>> {
 }
 
 class JobRepository {
+  final FirestoreService? _firestoreService;
   final List<JobModel> _jobs = List.from(MockDataSeed.jobs);
   final List<JobApplicationModel> _applications = List.from(MockDataSeed.applications);
   final ValueNotifier<List<JobModel>> _jobsNotifier = ValueNotifier([]);
+  final StreamController<List<JobModel>> _jobsStreamController = StreamController<List<JobModel>>.broadcast();
 
-  JobRepository() {
+  JobRepository({FirestoreService? firestoreService})
+      : _firestoreService = firestoreService {
     _jobsNotifier.value = List.unmodifiable(_jobs);
+
+    // Listen to live Cloud Firestore jobs if available
+    _firestoreService?.streamJobs().listen((remoteJobs) {
+      if (remoteJobs.isNotEmpty) {
+        for (final rj in remoteJobs) {
+          final idx = _jobs.indexWhere((j) => j.id == rj.id);
+          if (idx != -1) {
+            _jobs[idx] = rj;
+          } else {
+            _jobs.insert(0, rj);
+          }
+        }
+        _notify();
+      }
+    });
+
+    // Listen to live Cloud Firestore applications if available
+    _firestoreService?.streamApplications().listen((remoteApps) {
+      if (remoteApps.isNotEmpty) {
+        for (final ra in remoteApps) {
+          final idx = _applications.indexWhere((a) => a.id == ra.id);
+          if (idx != -1) {
+            _applications[idx] = ra;
+          } else {
+            _applications.insert(0, ra);
+          }
+        }
+      }
+    });
   }
 
-  Stream<List<JobModel>> get jobsStream => Stream.periodic(
-        const Duration(milliseconds: 500),
-        (_) => List<JobModel>.unmodifiable(_jobs),
-      ).distinct();
+  Stream<List<JobModel>> get jobsStream => _jobsStreamController.stream;
+
+  void _notify() {
+    final list = List<JobModel>.unmodifiable(_jobs);
+    _jobsNotifier.value = list;
+    if (!_jobsStreamController.isClosed) {
+      _jobsStreamController.add(list);
+    }
+  }
 
   List<JobModel> get allJobs => List.unmodifiable(_jobs);
   List<JobApplicationModel> get applications => List.unmodifiable(_applications);
@@ -144,7 +191,6 @@ class JobRepository {
     List<String> targetDepartments = const [],
     DateTime? deadline,
   }) {
-    // If posted by Admin, auto-approve; if posted by Alumni, requires Admin Approval to prevent scams!
     final initialStatus = poster.isAdmin ? JobStatus.approved : JobStatus.pendingApproval;
 
     final newJob = JobModel(
@@ -169,7 +215,8 @@ class JobRepository {
     );
 
     _jobs.insert(0, newJob);
-    _jobsNotifier.value = List.unmodifiable(_jobs);
+    _notify();
+    _firestoreService?.createJob(newJob);
     return newJob;
   }
 
@@ -177,7 +224,8 @@ class JobRepository {
     final idx = _jobs.indexWhere((j) => j.id == jobId);
     if (idx != -1) {
       _jobs[idx] = _jobs[idx].copyWith(status: JobStatus.approved);
-      _jobsNotifier.value = List.unmodifiable(_jobs);
+      _notify();
+      _firestoreService?.updateJobStatus(jobId, JobStatus.approved);
     }
   }
 
@@ -185,7 +233,8 @@ class JobRepository {
     final idx = _jobs.indexWhere((j) => j.id == jobId);
     if (idx != -1) {
       _jobs[idx] = _jobs[idx].copyWith(status: JobStatus.rejected);
-      _jobsNotifier.value = List.unmodifiable(_jobs);
+      _notify();
+      _firestoreService?.updateJobStatus(jobId, JobStatus.rejected);
     }
   }
 
@@ -215,15 +264,15 @@ class JobRepository {
 
     _applications.insert(0, newApp);
 
-    // Update applications count on the job
     final jobIdx = _jobs.indexWhere((j) => j.id == job.id);
     if (jobIdx != -1) {
       _jobs[jobIdx] = _jobs[jobIdx].copyWith(
         applicationsCount: _jobs[jobIdx].applicationsCount + 1,
       );
-      _jobsNotifier.value = List.unmodifiable(_jobs);
+      _notify();
     }
 
+    _firestoreService?.submitApplication(newApp);
     return newApp;
   }
 
@@ -246,6 +295,7 @@ class JobRepository {
         status: newStatus,
         reviewedAt: DateTime.now(),
       );
+      _firestoreService?.updateApplicationStatus(applicationId, newStatus);
     }
   }
 }

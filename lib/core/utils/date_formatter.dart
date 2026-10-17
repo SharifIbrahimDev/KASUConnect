@@ -26,6 +26,8 @@ class DateFormatter {
     return DateFormat('MMM d, y').format(dateTime);
   }
 
+  static String formatDate(DateTime? dateTime) => shortDate(dateTime);
+
   static String chatTime(DateTime dateTime) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);

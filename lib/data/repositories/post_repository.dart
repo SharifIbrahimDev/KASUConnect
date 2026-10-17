@@ -1,12 +1,15 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/post_model.dart';
 import '../models/comment_model.dart';
 import '../models/user_model.dart';
+import '../services/firestore_service.dart';
 import '../services/mock_data_seed.dart';
 
 final postRepositoryProvider = Provider<PostRepository>((ref) {
-  return PostRepository();
+  final firestore = ref.watch(firestoreServiceProvider);
+  return PostRepository(firestoreService: firestore);
 });
 
 final postsFeedProvider = StateNotifierProvider<PostsFeedNotifier, List<PostModel>>((ref) {
@@ -18,11 +21,18 @@ final selectedPostCategoryProvider = StateProvider<String>((ref) => 'all');
 
 class PostsFeedNotifier extends StateNotifier<List<PostModel>> {
   final PostRepository _repo;
+  StreamSubscription? _sub;
 
   PostsFeedNotifier(this._repo) : super(_repo.getPosts()) {
-    _repo.postsStream.listen((posts) {
+    _sub = _repo.postsStream.listen((posts) {
       state = posts;
     });
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
   }
 
   void addPost({
@@ -52,18 +62,41 @@ class PostsFeedNotifier extends StateNotifier<List<PostModel>> {
 }
 
 class PostRepository {
+  final FirestoreService? _firestoreService;
   final List<PostModel> _posts = List.from(MockDataSeed.posts);
   final List<CommentModel> _comments = List.from(MockDataSeed.comments);
   final ValueNotifier<List<PostModel>> _postsNotifier = ValueNotifier([]);
+  final StreamController<List<PostModel>> _postsStreamController = StreamController<List<PostModel>>.broadcast();
 
-  PostRepository() {
+  PostRepository({FirestoreService? firestoreService})
+      : _firestoreService = firestoreService {
     _postsNotifier.value = List.unmodifiable(_posts);
+
+    // Listen to live Cloud Firestore posts if available
+    _firestoreService?.streamPosts().listen((remotePosts) {
+      if (remotePosts.isNotEmpty) {
+        for (final rp in remotePosts) {
+          final idx = _posts.indexWhere((p) => p.id == rp.id);
+          if (idx != -1) {
+            _posts[idx] = rp;
+          } else {
+            _posts.insert(0, rp);
+          }
+        }
+        _notify();
+      }
+    });
   }
 
-  Stream<List<PostModel>> get postsStream => Stream.periodic(
-        const Duration(milliseconds: 500),
-        (_) => List<PostModel>.unmodifiable(_posts),
-      ).distinct();
+  Stream<List<PostModel>> get postsStream => _postsStreamController.stream;
+
+  void _notify() {
+    final list = List<PostModel>.unmodifiable(_posts);
+    _postsNotifier.value = list;
+    if (!_postsStreamController.isClosed) {
+      _postsStreamController.add(list);
+    }
+  }
 
   List<PostModel> getPosts({String category = 'all', String? department}) {
     var filtered = _posts.where((p) => true).toList();
@@ -109,7 +142,8 @@ class PostRepository {
     );
 
     _posts.insert(0, newPost);
-    _postsNotifier.value = List.unmodifiable(_posts);
+    _notify();
+    _firestoreService?.createPost(newPost);
   }
 
   void toggleLike(String postId, String userId) {
@@ -123,7 +157,8 @@ class PostRepository {
         currentLikes.add(userId);
       }
       _posts[idx] = post.copyWith(likes: currentLikes);
-      _postsNotifier.value = List.unmodifiable(_posts);
+      _notify();
+      _firestoreService?.togglePostLike(postId, userId);
     }
   }
 
@@ -152,7 +187,9 @@ class PostRepository {
       _posts[idx] = _posts[idx].copyWith(
         commentsCount: _posts[idx].commentsCount + 1,
       );
-      _postsNotifier.value = List.unmodifiable(_posts);
+      _notify();
     }
+
+    _firestoreService?.addComment(newComment);
   }
 }

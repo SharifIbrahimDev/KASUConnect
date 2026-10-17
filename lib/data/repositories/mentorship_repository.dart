@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/mentorship_model.dart';
@@ -17,11 +18,18 @@ final mentorshipListProvider = StateNotifierProvider<MentorshipNotifier, List<Me
 
 class MentorshipNotifier extends StateNotifier<List<MentorshipModel>> {
   final MentorshipRepository _repo;
+  StreamSubscription? _sub;
 
   MentorshipNotifier(this._repo) : super(_repo.allRequests) {
-    _repo.stream.listen((requests) {
+    _sub = _repo.stream.listen((requests) {
       state = requests;
     });
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
   }
 
   void sendRequest({
@@ -58,14 +66,21 @@ class MentorshipRepository {
   final List<MentorshipModel> _requests = List.from(MockDataSeed.mentorshipRequests);
   final ValueNotifier<List<MentorshipModel>> _notifier = ValueNotifier([]);
 
+  final StreamController<List<MentorshipModel>> _streamController = StreamController<List<MentorshipModel>>.broadcast();
+
   MentorshipRepository(this._authRepo) {
     _notifier.value = List.unmodifiable(_requests);
   }
 
-  Stream<List<MentorshipModel>> get stream => Stream.periodic(
-        const Duration(milliseconds: 500),
-        (_) => List<MentorshipModel>.unmodifiable(_requests),
-      ).distinct();
+  Stream<List<MentorshipModel>> get stream => _streamController.stream;
+
+  void _notify() {
+    final list = List<MentorshipModel>.unmodifiable(_requests);
+    _notifier.value = list;
+    if (!_streamController.isClosed) {
+      _streamController.add(list);
+    }
+  }
 
   List<MentorshipModel> get allRequests => List.unmodifiable(_requests);
 
@@ -124,7 +139,7 @@ class MentorshipRepository {
     );
 
     _requests.insert(0, req);
-    _notifier.value = List.unmodifiable(_requests);
+    _notify();
     return req;
   }
 
@@ -140,7 +155,7 @@ class MentorshipRepository {
         alumniResponseNote: responseNote,
         updatedAt: DateTime.now(),
       );
-      _notifier.value = List.unmodifiable(_requests);
+      _notify();
     }
   }
 

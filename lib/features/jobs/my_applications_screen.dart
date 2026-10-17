@@ -6,6 +6,7 @@ import '../../core/utils/date_formatter.dart';
 import '../../data/models/job_application_model.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../data/repositories/job_repository.dart';
+import 'widgets/cv_preview_dialog.dart';
 
 class MyApplicationsScreen extends ConsumerWidget {
   const MyApplicationsScreen({super.key});
@@ -139,20 +140,29 @@ class MyApplicationsScreen extends ConsumerWidget {
 
               const SizedBox(height: 12),
 
-              Row(
-                children: [
-                  const Icon(Icons.description_outlined, size: 16, color: AppColors.textSecondary),
-                  const SizedBox(width: 6),
-                  Text(
-                    'CV: ${app.cvFileName ?? 'Attached Resume'}',
-                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              InkWell(
+                onTap: () => CvPreviewDialog.show(context, application: app, isEmployer: false),
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.picture_as_pdf, size: 16, color: AppColors.error),
+                      const SizedBox(width: 6),
+                      Text(
+                        'CV: ${app.cvFileName ?? 'Attached Resume'}',
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.blue),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.open_in_new, size: 12, color: AppColors.blue),
+                      const Spacer(),
+                      Text(
+                        'Applied ${DateFormatter.timeAgo(app.appliedAt)}',
+                        style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                      ),
+                    ],
                   ),
-                  const Spacer(),
-                  Text(
-                    'Applied ${DateFormatter.timeAgo(app.appliedAt)}',
-                    style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
-                  ),
-                ],
+                ),
               ),
 
               if (app.coverNote != null) ...[

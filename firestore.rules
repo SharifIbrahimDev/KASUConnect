@@ -1,0 +1,176 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isUser(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.admin == true ||
+        getUserData().role == 'admin'
+      );
+    }
+
+    function isVerified() {
+      return isAuthenticated() && (
+        getUserData().verificationStatus == 'verified' ||
+        isAdmin()
+      );
+    }
+
+    function isAlumni() {
+      return isAuthenticated() && getUserData().role == 'alumni';
+    }
+
+    function isNotBlocked() {
+      return isAuthenticated() && (
+        !('isBlocked' in getUserData()) ||
+        getUserData().isBlocked == false ||
+        isAdmin()
+      );
+    }
+
+    // 1. Users Collection
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isUser(userId);
+      // Users can update their own details, but only admin can change verificationStatus, role, or isBlocked
+      allow update: if isAuthenticated() && (
+        isAdmin() || (
+          isUser(userId) &&
+          isNotBlocked() &&
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'verificationStatus', 'isBlocked'])
+        )
+      );
+      allow delete: if isAdmin();
+    }
+
+    // 2. Posts Collection
+    match /posts/{postId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isNotBlocked() && isVerified() &&
+                    request.resource.data.authorId == request.auth.uid;
+      // Allow author or admin to edit, and allow other verified users to update 'likes' array
+      allow update: if isAuthenticated() && (
+        isAdmin() ||
+        (resource.data.authorId == request.auth.uid && isNotBlocked()) ||
+        (isNotBlocked() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes']))
+      );
+      allow delete: if isAuthenticated() && (
+        isAdmin() || resource.data.authorId == request.auth.uid
+      );
+    }
+
+    // 3. Comments Collection
+    match /comments/{commentId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isNotBlocked() &&
+                    request.resource.data.authorId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && (
+        isAdmin() || resource.data.authorId == request.auth.uid
+      );
+    }
+
+    // 4. Jobs Collection
+    match /jobs/{jobId} {
+      // Anyone can view approved jobs. Poster and Admin can view pending/rejected jobs.
+      allow read: if isAuthenticated() && (
+        resource.data.status == 'approved' ||
+        resource.data.posterId == request.auth.uid ||
+        isAdmin()
+      );
+      // Verified Alumni or Admins can post jobs
+      allow create: if isAuthenticated() && isNotBlocked() && isVerified() &&
+                    (isAlumni() || isAdmin()) &&
+                    request.resource.data.posterId == request.auth.uid &&
+                    // Alumni jobs start as pendingApproval, Admins can create approved jobs
+                    (isAdmin() || request.resource.data.status == 'pendingApproval');
+      // Poster can edit description/deadline without changing approval status. Admin can update anything.
+      allow update: if isAuthenticated() && (
+        isAdmin() || (
+          resource.data.posterId == request.auth.uid &&
+          isNotBlocked() &&
+          request.resource.data.status == resource.data.status
+        )
+      );
+      allow delete: if isAuthenticated() && (
+        isAdmin() || resource.data.posterId == request.auth.uid
+      );
+    }
+
+    // 5. Job Applications Collection
+    match /job_applications/{appId} {
+      // Applicant, Employer (Job Poster), and Admin can read
+      allow read: if isAuthenticated() && (
+        resource.data.applicantId == request.auth.uid ||
+        resource.data.employerId == request.auth.uid ||
+        isAdmin()
+      );
+      // Students can apply with their own applicantId
+      allow create: if isAuthenticated() && isNotBlocked() &&
+                    request.resource.data.applicantId == request.auth.uid;
+      // Employer or Admin can update application status (accepted, rejected, reviewed)
+      allow update: if isAuthenticated() && (
+        isAdmin() ||
+        resource.data.employerId == request.auth.uid
+      );
+      allow delete: if isAdmin();
+    }
+
+    // 6. Mentorship Requests & Connections
+    match /mentorships/{mentorshipId} {
+      allow read: if isAuthenticated() && (
+        resource.data.studentId == request.auth.uid ||
+        resource.data.mentorId == request.auth.uid ||
+        isAdmin()
+      );
+      allow create: if isAuthenticated() && isNotBlocked() &&
+                    request.resource.data.studentId == request.auth.uid;
+      allow update: if isAuthenticated() && (
+        isAdmin() ||
+        resource.data.mentorId == request.auth.uid ||
+        resource.data.studentId == request.auth.uid
+      );
+      allow delete: if isAdmin();
+    }
+
+    // 7. Conversations & Direct Messages
+    match /conversations/{conversationId} {
+      allow read: if isAuthenticated() && (
+        request.auth.uid in resource.data.participantIds ||
+        resource.data.isGroup == true ||
+        isAdmin()
+      );
+      allow create: if isAuthenticated() && isNotBlocked() &&
+                    request.auth.uid in request.resource.data.participantIds;
+      allow update: if isAuthenticated() && isNotBlocked() && (
+        request.auth.uid in resource.data.participantIds ||
+        isAdmin()
+      );
+
+      match /messages/{messageId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated() && isNotBlocked() &&
+                      request.resource.data.senderId == request.auth.uid;
+        allow delete: if isAdmin();
+      }
+    }
+
+    // 8. Community Reports
+    match /reports/{reportId} {
+      allow create: if isAuthenticated() && isNotBlocked();
+      allow read, update, delete: if isAdmin();
+    }
+  }
+}

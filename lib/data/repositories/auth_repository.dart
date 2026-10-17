@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/user_model.dart';
@@ -14,11 +15,18 @@ final currentUserProvider = StateNotifierProvider<CurrentUserNotifier, UserModel
 
 class CurrentUserNotifier extends StateNotifier<UserModel?> {
   final AuthRepository _repo;
+  StreamSubscription<UserModel?>? _sub;
 
   CurrentUserNotifier(this._repo) : super(_repo.currentUser) {
-    _repo.userStream.listen((user) {
+    _sub = _repo.userStream.listen((user) {
       state = user;
     });
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
   }
 
   Future<void> signIn(String email, String password) async {
@@ -113,11 +121,17 @@ class AuthRepository {
     _userNotifier.value = _currentUser;
   }
 
+  final StreamController<UserModel?> _userStreamController = StreamController<UserModel?>.broadcast();
+
   UserModel? get currentUser => _currentUser;
-  Stream<UserModel?> get userStream => Stream.periodic(
-        const Duration(milliseconds: 300),
-        (_) => _currentUser,
-      ).distinct();
+  Stream<UserModel?> get userStream => _userStreamController.stream;
+
+  void _notifyUser() {
+    _userNotifier.value = _currentUser;
+    if (!_userStreamController.isClosed) {
+      _userStreamController.add(_currentUser);
+    }
+  }
 
   List<UserModel> get allUsers => List.unmodifiable(_allUsers);
 
@@ -151,7 +165,7 @@ class AuthRepository {
     }
 
     _currentUser = match;
-    _userNotifier.value = match;
+    _notifyUser();
     return match;
   }
 
@@ -183,7 +197,7 @@ class AuthRepository {
 
     _allUsers.add(newUser);
     _currentUser = newUser;
-    _userNotifier.value = newUser;
+    _notifyUser();
     return newUser;
   }
 
@@ -224,7 +238,7 @@ class AuthRepository {
 
     _allUsers.add(newUser);
     _currentUser = newUser;
-    _userNotifier.value = newUser;
+    _notifyUser();
     return newUser;
   }
 
@@ -242,13 +256,13 @@ class AuthRepository {
         break;
     }
     _currentUser = selected;
-    _userNotifier.value = selected;
+    _notifyUser();
     return selected;
   }
 
   Future<void> signOut() async {
     _currentUser = null;
-    _userNotifier.value = null;
+    _notifyUser();
   }
 
   void updateUserLocally(UserModel updated) {
@@ -260,7 +274,7 @@ class AuthRepository {
     }
     if (_currentUser?.id == updated.id) {
       _currentUser = updated;
-      _userNotifier.value = updated;
+      _notifyUser();
     }
   }
 
@@ -274,7 +288,7 @@ class AuthRepository {
       _allUsers[idx] = updated;
       if (_currentUser?.id == userId) {
         _currentUser = updated;
-        _userNotifier.value = updated;
+        _notifyUser();
       }
     }
   }

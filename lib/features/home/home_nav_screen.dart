@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/theme/app_theme.dart';
 import '../../data/models/user_model.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../feed/feed_screen.dart';
@@ -8,7 +7,6 @@ import '../networking/peer_search_screen.dart';
 import '../jobs/jobs_screen.dart';
 import '../alumni/alumni_hub_screen.dart';
 import '../alumni/mentorship_dashboard_screen.dart';
-import '../chat/chat_list_screen.dart';
 import '../admin/admin_dashboard_screen.dart';
 import '../admin/verification_queue_screen.dart';
 import '../admin/job_approval_screen.dart';

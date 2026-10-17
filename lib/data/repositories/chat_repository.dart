@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/chat_model.dart';
@@ -15,11 +16,18 @@ final chatConversationsProvider = StateNotifierProvider<ChatConversationsNotifie
 
 class ChatConversationsNotifier extends StateNotifier<List<ChatConversationModel>> {
   final ChatRepository _repo;
+  StreamSubscription? _sub;
 
   ChatConversationsNotifier(this._repo) : super(_repo.conversations) {
-    _repo.stream.listen((convs) {
+    _sub = _repo.stream.listen((convs) {
       state = convs;
     });
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
   }
 
   void refresh() {
@@ -31,15 +39,21 @@ class ChatRepository {
   final List<ChatConversationModel> _conversations = List.from(MockDataSeed.conversations);
   final List<ChatMessageModel> _messages = List.from(MockDataSeed.sampleMessages);
   final ValueNotifier<List<ChatConversationModel>> _notifier = ValueNotifier([]);
+  final StreamController<List<ChatConversationModel>> _streamController = StreamController<List<ChatConversationModel>>.broadcast();
 
   ChatRepository() {
     _notifier.value = List.unmodifiable(_conversations);
   }
 
-  Stream<List<ChatConversationModel>> get stream => Stream.periodic(
-        const Duration(milliseconds: 500),
-        (_) => List<ChatConversationModel>.unmodifiable(_conversations),
-      ).distinct();
+  Stream<List<ChatConversationModel>> get stream => _streamController.stream;
+
+  void _notify() {
+    final list = List<ChatConversationModel>.unmodifiable(_conversations);
+    _notifier.value = list;
+    if (!_streamController.isClosed) {
+      _streamController.add(list);
+    }
+  }
 
   List<ChatConversationModel> get conversations => List.unmodifiable(_conversations);
 
@@ -71,7 +85,6 @@ class ChatRepository {
       senderId: sender.id,
       senderName: sender.fullName,
       senderRole: sender.role.name,
-      senderAvatar: sender.avatarUrl,
       isSenderVerified: sender.isVerified,
       text: text,
       timestamp: DateTime.now(),
@@ -80,7 +93,6 @@ class ChatRepository {
 
     _messages.add(msg);
 
-    // Update conversation
     final idx = _conversations.indexWhere((c) => c.id == chatId);
     if (idx != -1) {
       _conversations[idx] = _conversations[idx].copyWith(
@@ -89,12 +101,11 @@ class ChatRepository {
       );
     }
 
-    _notifier.value = List.unmodifiable(_conversations);
+    _notify();
     return msg;
   }
 
   ChatConversationModel getOrCreateDirectChat(UserModel currentUser, UserModel otherUser) {
-    // Check if chat already exists
     final existing = _conversations.firstWhere(
       (c) =>
           !c.isDepartmentGroup &&
@@ -116,12 +127,12 @@ class ChatRepository {
             currentUser.id: currentUser.role.name,
             otherUser.id: otherUser.role.name,
           },
-          lastMessage: 'Started conversation with ${otherUser.fullName}',
+          lastMessage: 'Conversation started',
           lastMessageTime: DateTime.now(),
           unreadCount: 0,
         );
         _conversations.insert(0, newConv);
-        _notifier.value = List.unmodifiable(_conversations);
+        _notify();
         return newConv;
       },
     );
@@ -144,7 +155,7 @@ class ChatRepository {
           departmentName: departmentName,
         );
         _conversations.insert(0, newConv);
-        _notifier.value = List.unmodifiable(_conversations);
+        _notify();
         return newConv;
       },
     );

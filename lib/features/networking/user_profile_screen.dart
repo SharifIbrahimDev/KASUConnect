@@ -12,6 +12,8 @@ import '../../data/repositories/admin_repository.dart';
 import '../home/widgets/role_badge.dart';
 import '../alumni/mentorship_request_dialog.dart';
 import '../feed/widgets/post_card.dart';
+import '../jobs/widgets/cv_preview_dialog.dart';
+import '../../data/models/job_application_model.dart';
 
 class UserProfileScreen extends ConsumerWidget {
   final String userId;
@@ -358,11 +360,42 @@ class UserProfileScreen extends ConsumerWidget {
                                 ],
                               ),
                             ),
-                            if (isSelf)
+                            FilledButton.tonalIcon(
+                              onPressed: () {
+                                final dummyApp = JobApplicationModel(
+                                  id: 'profile_${user.id}',
+                                  jobId: '',
+                                  jobTitle: 'KASU Candidate Profile',
+                                  companyName: 'Academic Resume',
+                                  applicantId: user.id,
+                                  applicantName: user.fullName,
+                                  applicantEmail: user.email,
+                                  applicantDepartment: user.department,
+                                  applicantLevel: user.level,
+                                  cvFileName: user.cvFileName ?? '${user.fullName.replaceAll(' ', '_')}_Resume.pdf',
+                                  coverNote: user.bio,
+                                  status: ApplicationStatus.reviewed,
+                                  appliedAt: DateTime.now(),
+                                );
+                                CvPreviewDialog.show(
+                                  context,
+                                  application: dummyApp,
+                                  isEmployer: !isSelf,
+                                );
+                              },
+                              icon: const Icon(Icons.visibility, size: 16),
+                              label: const Text('Preview CV'),
+                              style: FilledButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              ),
+                            ),
+                            if (isSelf) ...[
+                              const SizedBox(width: 8),
                               TextButton(
                                 onPressed: () => context.push('/edit-profile'),
                                 child: Text(user.cvFileName == null ? 'Upload' : 'Change'),
                               ),
+                            ],
                           ],
                         ),
                       ),

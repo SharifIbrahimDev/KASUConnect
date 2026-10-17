@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
 import 'core/config/env.dart';
+import 'data/services/firestore_service.dart';
 import 'data/services/messaging_service.dart';
 import 'firebase_options.dart';
 
@@ -20,6 +21,8 @@ Future<void> main() async {
     if (!kIsWeb) {
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
     }
+    // Seed Firestore database if first time connecting
+    FirestoreService().seedDatabaseIfEmpty();
   } catch (e) {
     debugPrint('Firebase initialization notice: $e');
   }

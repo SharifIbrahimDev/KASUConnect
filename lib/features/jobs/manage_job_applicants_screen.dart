@@ -7,6 +7,7 @@ import '../../data/models/job_application_model.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../data/repositories/job_repository.dart';
 import '../../data/repositories/chat_repository.dart';
+import 'widgets/cv_preview_dialog.dart';
 
 class ManageJobApplicantsScreen extends ConsumerStatefulWidget {
   final String jobId;
@@ -125,26 +126,60 @@ class _ManageJobApplicantsScreenState extends ConsumerState<ManageJobApplicantsS
 
             const SizedBox(height: 12),
 
-            // CV attachment chip
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.grey.withValues(alpha: 0.08),
+            // CV attachment chip (tap to preview)
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
                 borderRadius: BorderRadius.circular(10),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.picture_as_pdf, color: AppColors.error, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      app.cvFileName ?? 'Applicant_Resume.pdf',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                onTap: () async {
+                  await CvPreviewDialog.show(context, application: app, isEmployer: true);
+                  setState(() {});
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.blue.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.blue.withValues(alpha: 0.25)),
                   ),
-                  const Text('Preview CV', style: TextStyle(fontSize: 12, color: AppColors.blue, fontWeight: FontWeight.w600)),
-                ],
+                  child: Row(
+                    children: [
+                      const Icon(Icons.picture_as_pdf, color: AppColors.error, size: 22),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              app.cvFileName ?? 'Applicant_Resume.pdf',
+                              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const Text(
+                              'Tap to inspect student resume & academic profile',
+                              style: TextStyle(fontSize: 10.5, color: AppColors.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.blue,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.visibility_rounded, color: Colors.white, size: 13),
+                            SizedBox(width: 4),
+                            Text('Preview CV', style: TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
 

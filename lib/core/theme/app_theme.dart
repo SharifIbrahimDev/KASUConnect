@@ -10,6 +10,8 @@ class AppColors {
   static const text = Color(0xFF111827);
   static const textSecondary = Color(0xFF64748B);
   static const success = Color(0xFF16A34A);
+  static const green = Color(0xFF0D5C3A); // Official KASU Green
+  static const accentGold = Color(0xFFD97706); // KASU Gold
   static const error = Color(0xFFDC2626);
   static const warning = Color(0xFFD97706);
   static const border = Color(0xFFE2E8F0);
