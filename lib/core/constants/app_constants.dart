@@ -75,5 +75,7 @@ class AppConstants {
 
 class AppAssets {
   static const kasuLogo = 'assets/images/kasu logo.jpg';
+  static const kasuLogoPng = 'assets/images/kasu_logo.png';
   static const kasuAlumni = 'assets/images/kasu alumni.jpg';
 }
+
