@@ -2,19 +2,33 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppColors {
-  static const navy = Color(0xFF0F172A);
-  static const blue = Color(0xFF2563EB);
-  static const teal = Color(0xFF14B8A6);
-  static const background = Color(0xFFF8FAFC);
+  // Official Kaduna State University (KASU) Color Combination
+  static const green = Color(0xFF0D5C3A); // Official KASU Deep Forest Green (Primary)
+  static const darkGreen = Color(0xFF083C25); // KASU Senate Dark Green
+  static const emerald = Color(0xFF15803D); // Vibrant Accent Green
+  static const mint = Color(0xFFE8F5E9); // KASU Mint Surface
+  static const gold = Color(0xFFD97706); // KASU Academic Gold (Secondary)
+  static const lightGold = Color(0xFFFEF3C7); // KASU Gold Badge / Container
+  static const accentGold = Color(0xFFD97706); // KASU Gold Accent
+
+  // Primary brand tokens
+  static const primary = Color(0xFF0D5C3A);
+  static const secondary = Color(0xFFD97706);
+
+  // Remapped tokens for existing UI components
+  static const blue = Color(0xFF0D5C3A); // Remapped to KASU Deep Green
+  static const teal = Color(0xFFD97706); // Remapped to KASU Warm Gold
+  static const navy = Color(0xFF092016); // Remapped to KASU Deep Forest Dark
+
+  // Neutral surfaces
+  static const background = Color(0xFFF6FAF7); // Soft KASU tinted light background
   static const surface = Color(0xFFFFFFFF);
-  static const text = Color(0xFF111827);
-  static const textSecondary = Color(0xFF64748B);
+  static const text = Color(0xFF0F1E17);
+  static const textSecondary = Color(0xFF526E60);
   static const success = Color(0xFF16A34A);
-  static const green = Color(0xFF0D5C3A); // Official KASU Green
-  static const accentGold = Color(0xFFD97706); // KASU Gold
   static const error = Color(0xFFDC2626);
   static const warning = Color(0xFFD97706);
-  static const border = Color(0xFFE2E8F0);
+  static const border = Color(0xFFE0EBE4); // Sage-tinted light border
 }
 
 class AppTheme {
@@ -26,12 +40,12 @@ class AppTheme {
   static ThemeData _build(Brightness b) {
     final isDark = b == Brightness.dark;
     final scheme = ColorScheme.fromSeed(
-      seedColor: AppColors.blue,
+      seedColor: AppColors.green,
       brightness: b,
-      primary: AppColors.blue,
-      secondary: AppColors.teal,
+      primary: AppColors.green,
+      secondary: AppColors.gold,
       error: AppColors.error,
-      surface: isDark ? const Color(0xFF111827) : AppColors.surface,
+      surface: isDark ? const Color(0xFF0F261C) : AppColors.surface,
     );
     final base = ThemeData(useMaterial3: true, colorScheme: scheme);
     final textTheme = GoogleFonts.interTextTheme(base.textTheme).apply(
@@ -41,7 +55,7 @@ class AppTheme {
     final border = OutlineInputBorder(
       borderRadius: BorderRadius.circular(radius),
       borderSide: BorderSide(
-          color: isDark ? const Color(0xFF334155) : AppColors.border),
+          color: isDark ? const Color(0xFF1B3D2E) : AppColors.border),
     );
     return base.copyWith(
       scaffoldBackgroundColor:
@@ -63,21 +77,23 @@ class AppTheme {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(radius),
           side: BorderSide(
-              color: isDark ? const Color(0xFF1E293B) : AppColors.border),
+              color: isDark ? const Color(0xFF1B3D2E) : AppColors.border),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        fillColor: isDark ? const Color(0xFF143325) : Colors.white,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         border: border,
         enabledBorder: border,
         focusedBorder: border.copyWith(
-            borderSide: const BorderSide(color: AppColors.blue, width: 1.5)),
+            borderSide: const BorderSide(color: AppColors.green, width: 1.5)),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
+          backgroundColor: AppColors.green,
+          foregroundColor: Colors.white,
           minimumSize: const Size.fromHeight(50),
           shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(radius)),
@@ -86,6 +102,8 @@ class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.green,
+          side: const BorderSide(color: AppColors.green),
           minimumSize: const Size.fromHeight(50),
           shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(radius)),
@@ -97,7 +115,7 @@ class AppTheme {
       navigationBarTheme: NavigationBarThemeData(
         height: 68,
         backgroundColor: scheme.surface,
-        indicatorColor: AppColors.blue.withValues(alpha: 0.12),
+        indicatorColor: AppColors.green.withValues(alpha: 0.14),
       ),
       snackBarTheme: const SnackBarThemeData(behavior: SnackBarBehavior.floating),
     );
