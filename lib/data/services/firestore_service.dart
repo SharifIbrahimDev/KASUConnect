@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/chat_model.dart';
@@ -16,7 +17,7 @@ final firestoreServiceProvider = Provider<FirestoreService>((ref) {
 });
 
 class FirestoreService {
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  FirebaseFirestore? get _db => Firebase.apps.isNotEmpty ? FirebaseFirestore.instance : null;
   bool _isAvailable = false;
 
   FirestoreService() {
@@ -26,8 +27,13 @@ class FirestoreService {
   bool get isAvailable => _isAvailable;
 
   Future<void> _checkAvailability() async {
+    final db = _db;
+    if (db == null) {
+      _isAvailable = false;
+      return;
+    }
     try {
-      await _db.collection('settings').doc('ping').get(const GetOptions(source: Source.serverAndCache));
+      await db.collection('settings').doc('ping').get(const GetOptions(source: Source.serverAndCache));
       _isAvailable = true;
     } catch (e) {
       debugPrint('Firestore availability notice (using local/mock sync if offline): $e');
@@ -38,11 +44,13 @@ class FirestoreService {
   // -------------------------------------------------------------
   // USERS
   // -------------------------------------------------------------
-  CollectionReference<Map<String, dynamic>> get _usersCol => _db.collection('users');
+  CollectionReference<Map<String, dynamic>>? get _usersCol => _db?.collection('users');
 
   Stream<List<UserModel>> streamUsers() {
+    final col = _usersCol;
+    if (col == null) return Stream.value(MockDataSeed.users);
     try {
-      return _usersCol.snapshots().map((snapshot) {
+      return col.snapshots().map((snapshot) {
         return snapshot.docs.map((doc) => UserModel.fromMap(doc.data(), id: doc.id)).toList();
       });
     } catch (e) {
@@ -52,16 +60,20 @@ class FirestoreService {
   }
 
   Future<void> syncUser(UserModel user) async {
+    final col = _usersCol;
+    if (col == null) return;
     try {
-      await _usersCol.doc(user.id).set(user.toMap(), SetOptions(merge: true));
+      await col.doc(user.id).set(user.toMap(), SetOptions(merge: true));
     } catch (e) {
       debugPrint('Firestore syncUser: $e');
     }
   }
 
   Future<UserModel?> getUser(String id) async {
+    final col = _usersCol;
+    if (col == null) return null;
     try {
-      final doc = await _usersCol.doc(id).get();
+      final doc = await col.doc(id).get();
       if (doc.exists && doc.data() != null) {
         return UserModel.fromMap(doc.data()!, id: doc.id);
       }
@@ -74,12 +86,14 @@ class FirestoreService {
   // -------------------------------------------------------------
   // POSTS & COMMENTS
   // -------------------------------------------------------------
-  CollectionReference<Map<String, dynamic>> get _postsCol => _db.collection('posts');
-  CollectionReference<Map<String, dynamic>> get _commentsCol => _db.collection('comments');
+  CollectionReference<Map<String, dynamic>>? get _postsCol => _db?.collection('posts');
+  CollectionReference<Map<String, dynamic>>? get _commentsCol => _db?.collection('comments');
 
   Stream<List<PostModel>> streamPosts() {
+    final col = _postsCol;
+    if (col == null) return Stream.value(MockDataSeed.posts);
     try {
-      return _postsCol.orderBy('createdAt', descending: true).snapshots().map((snapshot) {
+      return col.orderBy('createdAt', descending: true).snapshots().map((snapshot) {
         return snapshot.docs.map((doc) => PostModel.fromMap(doc.data(), id: doc.id)).toList();
       });
     } catch (e) {
@@ -89,16 +103,20 @@ class FirestoreService {
   }
 
   Future<void> createPost(PostModel post) async {
+    final col = _postsCol;
+    if (col == null) return;
     try {
-      await _postsCol.doc(post.id).set(post.toMap());
+      await col.doc(post.id).set(post.toMap());
     } catch (e) {
       debugPrint('Firestore createPost: $e');
     }
   }
 
   Future<void> togglePostLike(String postId, String userId) async {
+    final col = _postsCol;
+    if (col == null) return;
     try {
-      final docRef = _postsCol.doc(postId);
+      final docRef = col.doc(postId);
       final doc = await docRef.get();
       if (doc.exists) {
         final post = PostModel.fromMap(doc.data()!, id: doc.id);
@@ -116,8 +134,12 @@ class FirestoreService {
   }
 
   Stream<List<CommentModel>> streamComments(String postId) {
+    final col = _commentsCol;
+    if (col == null) {
+      return Stream.value(MockDataSeed.comments.where((c) => c.postId == postId).toList());
+    }
     try {
-      return _commentsCol
+      return col
           .where('postId', isEqualTo: postId)
           .orderBy('createdAt', descending: false)
           .snapshots()
@@ -131,9 +153,12 @@ class FirestoreService {
   }
 
   Future<void> addComment(CommentModel comment) async {
+    final comCol = _commentsCol;
+    final postCol = _postsCol;
+    if (comCol == null || postCol == null) return;
     try {
-      await _commentsCol.doc(comment.id).set(comment.toMap());
-      await _postsCol.doc(comment.postId).update({
+      await comCol.doc(comment.id).set(comment.toMap());
+      await postCol.doc(comment.postId).update({
         'commentsCount': FieldValue.increment(1),
       });
     } catch (e) {
@@ -144,12 +169,14 @@ class FirestoreService {
   // -------------------------------------------------------------
   // JOBS & APPLICATIONS
   // -------------------------------------------------------------
-  CollectionReference<Map<String, dynamic>> get _jobsCol => _db.collection('jobs');
-  CollectionReference<Map<String, dynamic>> get _applicationsCol => _db.collection('job_applications');
+  CollectionReference<Map<String, dynamic>>? get _jobsCol => _db?.collection('jobs');
+  CollectionReference<Map<String, dynamic>>? get _applicationsCol => _db?.collection('job_applications');
 
   Stream<List<JobModel>> streamJobs() {
+    final col = _jobsCol;
+    if (col == null) return Stream.value(MockDataSeed.jobs);
     try {
-      return _jobsCol.orderBy('createdAt', descending: true).snapshots().map((snapshot) {
+      return col.orderBy('createdAt', descending: true).snapshots().map((snapshot) {
         return snapshot.docs.map((doc) => JobModel.fromMap(doc.data(), id: doc.id)).toList();
       });
     } catch (e) {
@@ -159,24 +186,35 @@ class FirestoreService {
   }
 
   Future<void> createJob(JobModel job) async {
+    final col = _jobsCol;
+    if (col == null) return;
     try {
-      await _jobsCol.doc(job.id).set(job.toMap());
+      await col.doc(job.id).set(job.toMap());
     } catch (e) {
       debugPrint('Firestore createJob: $e');
     }
   }
 
   Future<void> updateJobStatus(String jobId, JobStatus status) async {
+    final col = _jobsCol;
+    if (col == null) return;
     try {
-      await _jobsCol.doc(jobId).update({'status': status.name});
+      await col.doc(jobId).update({'status': status.name});
     } catch (e) {
       debugPrint('Firestore updateJobStatus: $e');
     }
   }
 
   Stream<List<JobApplicationModel>> streamApplications({String? userId, String? jobId}) {
+    final col = _applicationsCol;
+    if (col == null) {
+      var list = MockDataSeed.applications;
+      if (userId != null) list = list.where((a) => a.applicantId == userId).toList();
+      if (jobId != null) list = list.where((a) => a.jobId == jobId).toList();
+      return Stream.value(list);
+    }
     try {
-      Query<Map<String, dynamic>> query = _applicationsCol;
+      Query<Map<String, dynamic>> query = col;
       if (userId != null) {
         query = query.where('applicantId', isEqualTo: userId);
       }
@@ -196,9 +234,12 @@ class FirestoreService {
   }
 
   Future<void> submitApplication(JobApplicationModel app) async {
+    final appCol = _applicationsCol;
+    final jobCol = _jobsCol;
+    if (appCol == null || jobCol == null) return;
     try {
-      await _applicationsCol.doc(app.id).set(app.toMap());
-      await _jobsCol.doc(app.jobId).update({
+      await appCol.doc(app.id).set(app.toMap());
+      await jobCol.doc(app.jobId).update({
         'applicationsCount': FieldValue.increment(1),
       });
     } catch (e) {
@@ -207,8 +248,10 @@ class FirestoreService {
   }
 
   Future<void> updateApplicationStatus(String appId, ApplicationStatus status) async {
+    final col = _applicationsCol;
+    if (col == null) return;
     try {
-      await _applicationsCol.doc(appId).update({
+      await col.doc(appId).update({
         'status': status.name,
         'reviewedAt': DateTime.now().toIso8601String(),
       });
@@ -220,11 +263,15 @@ class FirestoreService {
   // -------------------------------------------------------------
   // MENTORSHIP
   // -------------------------------------------------------------
-  CollectionReference<Map<String, dynamic>> get _mentorshipsCol => _db.collection('mentorships');
+  CollectionReference<Map<String, dynamic>>? get _mentorshipsCol => _db?.collection('mentorships');
 
   Stream<List<MentorshipModel>> streamMentorships(String userId) {
+    final col = _mentorshipsCol;
+    if (col == null) {
+      return Stream.value(MockDataSeed.mentorshipRequests.where((m) => m.studentId == userId || m.alumniId == userId).toList());
+    }
     try {
-      return _mentorshipsCol.snapshots().map((snapshot) {
+      return col.snapshots().map((snapshot) {
         return snapshot.docs
             .map((doc) => MentorshipModel.fromMap(doc.data(), id: doc.id))
             .where((m) => m.studentId == userId || m.alumniId == userId)
@@ -237,16 +284,20 @@ class FirestoreService {
   }
 
   Future<void> requestMentorship(MentorshipModel request) async {
+    final col = _mentorshipsCol;
+    if (col == null) return;
     try {
-      await _mentorshipsCol.doc(request.id).set(request.toMap());
+      await col.doc(request.id).set(request.toMap());
     } catch (e) {
       debugPrint('Firestore requestMentorship: $e');
     }
   }
 
   Future<void> updateMentorshipStatus(String id, MentorshipStatus status) async {
+    final col = _mentorshipsCol;
+    if (col == null) return;
     try {
-      await _mentorshipsCol.doc(id).update({
+      await col.doc(id).update({
         'status': status.name,
         'updatedAt': DateTime.now().toIso8601String(),
       });
@@ -258,11 +309,15 @@ class FirestoreService {
   // -------------------------------------------------------------
   // CHAT & MESSAGING
   // -------------------------------------------------------------
-  CollectionReference<Map<String, dynamic>> get _conversationsCol => _db.collection('conversations');
+  CollectionReference<Map<String, dynamic>>? get _conversationsCol => _db?.collection('conversations');
 
   Stream<List<ChatConversationModel>> streamConversations(String userId) {
+    final col = _conversationsCol;
+    if (col == null) {
+      return Stream.value(MockDataSeed.conversations.where((c) => c.participantIds.contains(userId)).toList());
+    }
     try {
-      return _conversationsCol
+      return col
           .where('participantIds', arrayContains: userId)
           .orderBy('lastMessageTime', descending: true)
           .snapshots()
@@ -276,8 +331,12 @@ class FirestoreService {
   }
 
   Stream<List<ChatMessageModel>> streamMessages(String conversationId) {
+    final col = _conversationsCol;
+    if (col == null) {
+      return Stream.value(MockDataSeed.sampleMessages.where((m) => m.chatId == conversationId).toList());
+    }
     try {
-      return _conversationsCol
+      return col
           .doc(conversationId)
           .collection('messages')
           .orderBy('timestamp', descending: false)
@@ -292,9 +351,11 @@ class FirestoreService {
   }
 
   Future<void> sendMessage(String conversationId, ChatMessageModel msg) async {
+    final col = _conversationsCol;
+    if (col == null) return;
     try {
-      await _conversationsCol.doc(conversationId).collection('messages').doc(msg.id).set(msg.toMap());
-      await _conversationsCol.doc(conversationId).update({
+      await col.doc(conversationId).collection('messages').doc(msg.id).set(msg.toMap());
+      await col.doc(conversationId).update({
         'lastMessage': msg.text,
         'lastMessageTime': msg.timestamp.toIso8601String(),
       });
@@ -306,11 +367,13 @@ class FirestoreService {
   // -------------------------------------------------------------
   // COMMUNITY REPORTS & MODERATION
   // -------------------------------------------------------------
-  CollectionReference<Map<String, dynamic>> get _reportsCol => _db.collection('reports');
+  CollectionReference<Map<String, dynamic>>? get _reportsCol => _db?.collection('reports');
 
   Stream<List<ReportModel>> streamReports() {
+    final col = _reportsCol;
+    if (col == null) return Stream.value(MockDataSeed.reports);
     try {
-      return _reportsCol.orderBy('createdAt', descending: true).snapshots().map((snapshot) {
+      return col.orderBy('createdAt', descending: true).snapshots().map((snapshot) {
         return snapshot.docs.map((doc) => ReportModel.fromMap(doc.data(), id: doc.id)).toList();
       });
     } catch (e) {
@@ -320,16 +383,20 @@ class FirestoreService {
   }
 
   Future<void> submitReport(ReportModel report) async {
+    final col = _reportsCol;
+    if (col == null) return;
     try {
-      await _reportsCol.doc(report.id).set(report.toMap());
+      await col.doc(report.id).set(report.toMap());
     } catch (e) {
       debugPrint('Firestore submitReport: $e');
     }
   }
 
   Future<void> updateReportStatus(String reportId, String status) async {
+    final col = _reportsCol;
+    if (col == null) return;
     try {
-      await _reportsCol.doc(reportId).update({
+      await col.doc(reportId).update({
         'status': status,
       });
     } catch (e) {
@@ -341,26 +408,37 @@ class FirestoreService {
   // INITIAL SEEDING HELPER
   // -------------------------------------------------------------
   Future<void> seedDatabaseIfEmpty() async {
+    final db = _db;
+    final posts = _postsCol;
+    final users = _usersCol;
+    final jobs = _jobsCol;
+    final apps = _applicationsCol;
+    final mentors = _mentorshipsCol;
+
+    if (db == null || posts == null || users == null || jobs == null || apps == null || mentors == null) {
+      return;
+    }
+
     try {
-      final snap = await _postsCol.limit(1).get();
+      final snap = await posts.limit(1).get();
       if (snap.docs.isEmpty) {
         debugPrint('Seeding initial KASUConnect dataset to Cloud Firestore...');
-        final batch = _db.batch();
+        final batch = db.batch();
 
         for (final user in MockDataSeed.users) {
-          batch.set(_usersCol.doc(user.id), user.toMap());
+          batch.set(users.doc(user.id), user.toMap());
         }
         for (final post in MockDataSeed.posts) {
-          batch.set(_postsCol.doc(post.id), post.toMap());
+          batch.set(posts.doc(post.id), post.toMap());
         }
         for (final job in MockDataSeed.jobs) {
-          batch.set(_jobsCol.doc(job.id), job.toMap());
+          batch.set(jobs.doc(job.id), job.toMap());
         }
         for (final app in MockDataSeed.applications) {
-          batch.set(_applicationsCol.doc(app.id), app.toMap());
+          batch.set(apps.doc(app.id), app.toMap());
         }
         for (final m in MockDataSeed.mentorshipRequests) {
-          batch.set(_mentorshipsCol.doc(m.id), m.toMap());
+          batch.set(mentors.doc(m.id), m.toMap());
         }
 
         await batch.commit();

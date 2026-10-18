@@ -1,11 +1,15 @@
 import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/user_model.dart';
+import '../services/firestore_service.dart';
 import '../services/mock_data_seed.dart';
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
-  return AuthRepository();
+  final firestore = ref.watch(firestoreServiceProvider);
+  return AuthRepository(firestoreService: firestore);
 });
 
 final currentUserProvider = StateNotifierProvider<CurrentUserNotifier, UserModel?>((ref) {
@@ -109,19 +113,44 @@ class CurrentUserNotifier extends StateNotifier<UserModel?> {
 }
 
 class AuthRepository {
+  final FirestoreService? _firestoreService;
+
   // In-memory users store initialized with MockDataSeed
   final List<UserModel> _allUsers = List.from(MockDataSeed.users);
 
   // Default active user is Student Fatima Bello (student_1)
   UserModel? _currentUser;
   final ValueNotifier<UserModel?> _userNotifier = ValueNotifier<UserModel?>(null);
+  final StreamController<UserModel?> _userStreamController = StreamController<UserModel?>.broadcast();
 
-  AuthRepository() {
+  AuthRepository({FirestoreService? firestoreService})
+      : _firestoreService = firestoreService {
     _currentUser = _allUsers.firstWhere((u) => u.id == 'student_1');
     _userNotifier.value = _currentUser;
-  }
 
-  final StreamController<UserModel?> _userStreamController = StreamController<UserModel?>.broadcast();
+    // Listen to Firebase Auth state changes
+    if (Firebase.apps.isNotEmpty) {
+      try {
+        FirebaseAuth.instance.authStateChanges().listen((fbUser) async {
+          if (fbUser != null) {
+            final profile = await _firestoreService?.getUser(fbUser.uid);
+            if (profile != null) {
+              _currentUser = profile;
+              final idx = _allUsers.indexWhere((u) => u.id == profile.id);
+              if (idx != -1) {
+                _allUsers[idx] = profile;
+              } else {
+                _allUsers.add(profile);
+              }
+              _notifyUser();
+            }
+          }
+        });
+      } catch (e) {
+        debugPrint('FirebaseAuth listener notice: $e');
+      }
+    }
+  }
 
   UserModel? get currentUser => _currentUser;
   Stream<UserModel?> get userStream => _userStreamController.stream;
@@ -136,14 +165,40 @@ class AuthRepository {
   List<UserModel> get allUsers => List.unmodifiable(_allUsers);
 
   Future<UserModel> signIn(String email, String password) async {
-    // Check if user exists in mock seed
+    // 1. Try signing in through Firebase Auth
+    if (Firebase.apps.isNotEmpty) {
+      try {
+        final cred = await FirebaseAuth.instance.signInWithEmailAndPassword(
+          email: email.trim(),
+          password: password,
+        );
+        final uid = cred.user?.uid;
+        if (uid != null) {
+          final remoteProfile = await _firestoreService?.getUser(uid);
+          if (remoteProfile != null) {
+            _currentUser = remoteProfile;
+            final idx = _allUsers.indexWhere((u) => u.id == remoteProfile.id);
+            if (idx != -1) {
+              _allUsers[idx] = remoteProfile;
+            } else {
+              _allUsers.add(remoteProfile);
+            }
+            _notifyUser();
+            return remoteProfile;
+          }
+        }
+      } catch (e) {
+        debugPrint('Firebase Auth sign in notice (fallback to demo accounts): $e');
+      }
+    }
+
+    // 2. Fallback to demo account matching
     final match = _allUsers.firstWhere(
       (u) => u.email.toLowerCase() == email.trim().toLowerCase(),
       orElse: () {
-        // Fallback demo user if typed
         return UserModel(
           id: 'user_${DateTime.now().millisecondsSinceEpoch}',
-          email: email,
+          email: email.trim(),
           fullName: email.split('@').first.replaceAll('.', ' ').toUpperCase(),
           role: email.contains('alumni')
               ? UserRole.alumni
@@ -180,9 +235,27 @@ class AuthRepository {
     required List<String> skills,
     String? bio,
   }) async {
+    String userId = 'student_${DateTime.now().millisecondsSinceEpoch}';
+
+    // 1. Create user in Firebase Auth
+    if (Firebase.apps.isNotEmpty) {
+      try {
+        final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+          email: email.trim(),
+          password: password,
+        );
+        if (cred.user != null) {
+          userId = cred.user!.uid;
+          await cred.user!.updateDisplayName(fullName);
+        }
+      } catch (e) {
+        debugPrint('Firebase Auth registerStudent notice: $e');
+      }
+    }
+
     final newUser = UserModel(
-      id: 'student_${DateTime.now().millisecondsSinceEpoch}',
-      email: email,
+      id: userId,
+      email: email.trim(),
       fullName: fullName,
       role: UserRole.student,
       matricNumber: matricNumber,
@@ -198,6 +271,9 @@ class AuthRepository {
     _allUsers.add(newUser);
     _currentUser = newUser;
     _notifyUser();
+
+    // 2. Sync to Cloud Firestore
+    await _firestoreService?.syncUser(newUser);
     return newUser;
   }
 
@@ -216,9 +292,27 @@ class AuthRepository {
     String? mentorBio,
     String? bio,
   }) async {
+    String userId = 'alumni_${DateTime.now().millisecondsSinceEpoch}';
+
+    // 1. Create user in Firebase Auth
+    if (Firebase.apps.isNotEmpty) {
+      try {
+        final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+          email: email.trim(),
+          password: password,
+        );
+        if (cred.user != null) {
+          userId = cred.user!.uid;
+          await cred.user!.updateDisplayName(fullName);
+        }
+      } catch (e) {
+        debugPrint('Firebase Auth registerAlumni notice: $e');
+      }
+    }
+
     final newUser = UserModel(
-      id: 'alumni_${DateTime.now().millisecondsSinceEpoch}',
-      email: email,
+      id: userId,
+      email: email.trim(),
       fullName: fullName,
       role: UserRole.alumni,
       alumniId: alumniId,
@@ -239,6 +333,9 @@ class AuthRepository {
     _allUsers.add(newUser);
     _currentUser = newUser;
     _notifyUser();
+
+    // 2. Sync to Cloud Firestore
+    await _firestoreService?.syncUser(newUser);
     return newUser;
   }
 
@@ -261,6 +358,13 @@ class AuthRepository {
   }
 
   Future<void> signOut() async {
+    if (Firebase.apps.isNotEmpty) {
+      try {
+        await FirebaseAuth.instance.signOut();
+      } catch (e) {
+        debugPrint('Firebase Auth signOut notice: $e');
+      }
+    }
     _currentUser = null;
     _notifyUser();
   }
@@ -276,6 +380,7 @@ class AuthRepository {
       _currentUser = updated;
       _notifyUser();
     }
+    _firestoreService?.syncUser(updated);
   }
 
   void verifyUser(String userId, bool approve) {
@@ -290,6 +395,7 @@ class AuthRepository {
         _currentUser = updated;
         _notifyUser();
       }
+      _firestoreService?.syncUser(updated);
     }
   }
 
@@ -297,7 +403,9 @@ class AuthRepository {
     final idx = _allUsers.indexWhere((u) => u.id == userId);
     if (idx != -1) {
       final user = _allUsers[idx];
-      _allUsers[idx] = user.copyWith(isBlocked: !user.isBlocked);
+      final updated = user.copyWith(isBlocked: !user.isBlocked);
+      _allUsers[idx] = updated;
+      _firestoreService?.syncUser(updated);
     }
   }
 }
