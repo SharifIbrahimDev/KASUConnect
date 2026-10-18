@@ -34,16 +34,91 @@
 
   <title>KASUConnect — KASU Student & Alumni Network</title>
   <link rel="manifest" href="manifest.json">
+
+  <style>
+    body {
+      margin: 0;
+      background-color: #0D5C3A;
+      overflow: hidden;
+    }
+    #splash {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(180deg, #0D5C3A 0%, #083C25 55%, #052416 100%);
+      z-index: 999999;
+      transition: opacity 0.5s ease-out;
+    }
+    .splash-crest {
+      width: 104px;
+      height: 104px;
+      border-radius: 50%;
+      border: 3.5px solid #F59E0B;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4), 0 0 20px rgba(245, 158, 11, 0.35);
+      margin-bottom: 22px;
+      background-color: #FFFFFF;
+      object-fit: cover;
+    }
+    .splash-title {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 30px;
+      font-weight: 900;
+      color: #FFFFFF;
+      letter-spacing: 1.2px;
+      margin-bottom: 6px;
+    }
+    .splash-badge {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 11px;
+      font-weight: 800;
+      color: #FDE68A;
+      letter-spacing: 2.2px;
+      text-transform: uppercase;
+      padding: 4px 14px;
+      background: rgba(245, 158, 11, 0.2);
+      border: 1px solid rgba(245, 158, 11, 0.5);
+      border-radius: 20px;
+      margin-bottom: 30px;
+    }
+    .splash-spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid rgba(255, 255, 255, 0.2);
+      border-top-color: #F59E0B;
+      border-radius: 50%;
+      animation: splash-spin 0.85s linear infinite;
+    }
+    @keyframes splash-spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
 </head>
 <body>
-  <!--
-    You can customize the "flutter_bootstrap.js" script.
-    This is useful to provide a custom configuration to the Flutter loader
-    or to give the user feedback during the initialization process.
+  <div id="splash">
+    <img src="icons/Icon-192.png" alt="KASU Crest" class="splash-crest">
+    <div class="splash-title">KASUConnect</div>
+    <div class="splash-badge">Kaduna State University</div>
+    <div class="splash-spinner"></div>
+  </div>
 
-    For more details:
-    * https://docs.flutter.dev/platform-integration/web/initialization
-  -->
+  <script>
+    window.addEventListener('flutter-first-frame', function () {
+      var splash = document.getElementById('splash');
+      if (splash) {
+        splash.style.opacity = '0';
+        setTimeout(function () {
+          splash.remove();
+        }, 500);
+      }
+    });
+  </script>
+
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

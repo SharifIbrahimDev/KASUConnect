@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../data/repositories/auth_repository.dart';
+import '../../features/auth/splash_screen.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/auth/register_student_screen.dart';
 import '../../features/auth/register_alumni_screen.dart';
@@ -29,11 +29,13 @@ import '../../features/admin/report_moderation_screen.dart';
 import '../../features/settings/settings_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final authRepo = ref.watch(authRepositoryProvider);
-
   return GoRouter(
-    initialLocation: authRepo.currentUser != null ? '/home' : '/login',
+    initialLocation: '/splash',
     routes: [
+      GoRoute(
+        path: '/splash',
+        builder: (context, state) => const SplashScreen(),
+      ),
       GoRoute(
         path: '/login',
         builder: (context, state) => const LoginScreen(),
